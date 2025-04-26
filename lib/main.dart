@@ -26,7 +26,7 @@ class RememberMeApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Remember Me',
+      title: 'Remember me',
       theme: ThemeData(
         primaryColor: const Color(0xFF1976D2),
         scaffoldBackgroundColor: Colors.white,
@@ -56,10 +56,7 @@ class RememberMeApp extends StatelessWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      supportedLocales: const [
-        Locale('en', ''),
-        Locale('fr', ''),
-      ],
+      supportedLocales: const [Locale('en', ''), Locale('fr', '')],
       initialRoute: '/splash',
       routes: {
         '/splash': (context) => const SplashScreen(),
@@ -69,7 +66,8 @@ class RememberMeApp extends StatelessWidget {
         '/main': (context) => const MainScreen(),
         '/doctor-main': (context) => const DoctorMainScreen(),
         '/profile': (context) => const ProfileScreen(),
-        '/cognitive-test': (context) => const CognitiveTestScreen(), // Add this route
+        '/cognitive-test':
+            (context) => const CognitiveTestScreen(), // Add this route
       },
     );
   }
