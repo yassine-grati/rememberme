@@ -1,0 +1,181 @@
+import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../widgets/custom_text_field.dart';
+import '../widgets/custom_button.dart';
+
+class DoctorRegistrationScreen extends StatefulWidget {
+  const DoctorRegistrationScreen({super.key});
+
+  @override
+  State<DoctorRegistrationScreen> createState() =>
+      _DoctorRegistrationScreenState();
+}
+
+class _DoctorRegistrationScreenState extends State<DoctorRegistrationScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _usernameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _locationController = TextEditingController();
+  final _matriculeController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  @override
+  void dispose() {
+    _usernameController.dispose();
+    _emailController.dispose();
+    _locationController.dispose();
+    _matriculeController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _register() async {
+    if (_formKey.currentState!.validate()) {
+      try {
+        // Créer un compte avec Firebase Authentication
+        UserCredential userCredential =
+            await _auth.createUserWithEmailAndPassword(
+          email: _emailController.text.trim(),
+          password: _passwordController.text.trim(),
+        );
+
+        // Récupérer l'utilisateur créé
+        User? user = userCredential.user;
+        if (user != null) {
+          // Stocker les informations dans Firestore
+          await _firestore.collection('users').doc(user.uid).set({
+            'userType': 'doctor',
+            'username': _usernameController.text.trim(),
+            'email': _emailController.text.trim(),
+            'location': _locationController.text.trim(),
+            'matriculeMedical': _matriculeController.text.trim(),
+          });
+
+          // Rediriger vers la page d'accueil des docteurs
+          Navigator.pushReplacementNamed(context, '/doctor-main');
+        }
+      } on FirebaseAuthException catch (e) {
+        String message;
+        if (e.code == 'email-already-in-use') {
+          message = 'Cet email est déjà utilisé.';
+        } else if (e.code == 'weak-password') {
+          message = 'Le mot de passe est trop faible.';
+        } else {
+          message = 'Erreur d’inscription : ${e.message}';
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message)),
+        );
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur : $e')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      resizeToAvoidBottomInset: true,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 16.0),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).primaryColor,
+                    borderRadius: BorderRadius.circular(16.0),
+                  ),
+                  child: Center(
+                    child: Text(
+                      'REMEMBER Me',
+                      style: Theme.of(context).textTheme.headlineSmall,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16.0),
+                Form(
+                  key: _formKey,
+                  child: Column(
+                    children: [
+                      CustomTextField(
+                        label: 'user name',
+                        controller: _usernameController,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter your username';
+                          }
+                          return null;
+                        },
+                      ),
+                      CustomTextField(
+                        label: 'email',
+                        controller: _emailController,
+                        keyboardType: TextInputType.emailAddress,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter your email';
+                          }
+                          if (!RegExp(r'^[^@]+@[^@]+\.[^@]+')
+                              .hasMatch(value)) {
+                            return 'Please enter a valid email';
+                          }
+                          return null;
+                        },
+                      ),
+                      CustomTextField(
+                        label: 'Location',
+                        controller: _locationController,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter your location';
+                          }
+                          return null;
+                        },
+                      ),
+                      CustomTextField(
+                        label: 'Matricule medical',
+                        controller: _matriculeController,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter your medical matricule';
+                          }
+                          return null;
+                        },
+                      ),
+                      CustomTextField(
+                        label: 'Password',
+                        controller: _passwordController,
+                        obscureText: true,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter your password';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16.0),
+                      CustomButton(
+                        text: 'ENregistrer',
+                        onPressed: _register,
+                      ),
+                      const SizedBox(height: 16.0),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
