@@ -22,7 +22,7 @@ class _SplashScreenState extends State<SplashScreen> {
       backgroundColor: Theme.of(context).primaryColor,
       body: Center(
         child: Text(
-          'REMEMBER ME',
+          'REMEMBER me',
           style: Theme.of(context).textTheme.headlineSmall,
         ),
       ),
