@@ -28,7 +28,7 @@ class RememberMeApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Remember Me',
+      title: 'Remember Me ',
       theme: ThemeData(
         primaryColor: const Color(0xFF6F35A5),
         scaffoldBackgroundColor: Colors.transparent,
@@ -83,7 +83,10 @@ class RememberMeApp extends StatelessWidget {
           style: TextButton.styleFrom(
             foregroundColor: Colors.white,
             backgroundColor: const Color(0xFF6F35A5).withOpacity(0.9),
-            padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 20.0,
+              vertical: 10.0,
+            ),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(25.0),
             ),
@@ -99,12 +102,9 @@ class RememberMeApp extends StatelessWidget {
           ),
         ),
         canvasColor: Colors.transparent,
-        dialogBackgroundColor: Colors.transparent,
         // Ajout pour les widgets de cognition_package
-        colorScheme: const ColorScheme.dark(
-          background: Colors.transparent,
-          surface: Colors.transparent,
-        ),
+        colorScheme: const ColorScheme.dark(surface: Colors.transparent),
+        dialogTheme: DialogThemeData(backgroundColor: Colors.transparent),
       ),
       localizationsDelegates: [
         RPLocalizations.delegate,
@@ -113,10 +113,7 @@ class RememberMeApp extends StatelessWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      supportedLocales: const [
-        Locale('en', ''),
-        Locale('fr', ''),
-      ],
+      supportedLocales: const [Locale('en', ''), Locale('fr', '')],
       initialRoute: '/splash',
       routes: {
         '/splash': (context) => const SplashScreen(),

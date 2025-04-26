@@ -113,7 +113,7 @@ class PatientHistoryScreen extends StatelessWidget {
                                       ],
                                     ),
                                   );
-                                }).toList(),
+                                }),
                               ],
                             ),
                           ),

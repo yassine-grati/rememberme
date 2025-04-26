@@ -120,7 +120,7 @@ class HistoryScreen extends StatelessWidget {
                                       ],
                                     ),
                                   );
-                                }).toList(),
+                                }),
                               ],
                             ),
                           ),
