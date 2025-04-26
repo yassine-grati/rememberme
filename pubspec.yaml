@@ -38,14 +38,18 @@ dependencies:
   firebase_auth: ^5.3.1
   cloud_firestore: ^5.4.4
   google_api_availability: ^5.0.1
-  research_package: ^1.8.0  # Replace with the latest version
-  cognition_package: ^1.1.0
+  intl: ^0.19.0
+  research_package: ^1.8.0
+  cognition_package: ^1.6.2
+  google_fonts: ^6.1.0
+  animate_do: ^3.1.2
   flutter_localizations: # Add this dependency
     sdk: flutter
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  flutter_launcher_icons: ^0.13.1
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
@@ -67,6 +71,15 @@ flutter:
   assets:
     - assets/images/
     - assets/lang/
+    - assets/images/background.png
+    - assets/images/illustration.png
+flutter_launcher_icons:
+    android: true
+    ios: true
+    image_path: "assets/images/icon.png"
+    min_sdk_android: 21 # Minimum pour Android
+    adaptive_icon_background: "#1976D2" # Couleur de fond pour l'icône adaptative (Android)
+    adaptive_icon_foreground: "assets/images/icon.png" # Image pour l'icône adaptative
 
   # To add assets to your application, add an assets section, like this:
   # assets:

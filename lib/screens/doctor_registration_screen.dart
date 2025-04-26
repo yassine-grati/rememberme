@@ -8,23 +8,22 @@ class DoctorRegistrationScreen extends StatefulWidget {
   const DoctorRegistrationScreen({super.key});
 
   @override
-  State<DoctorRegistrationScreen> createState() =>
-      _DoctorRegistrationScreenState();
+  State<DoctorRegistrationScreen> createState() => _DoctorRegistrationScreenState();
 }
 
 class _DoctorRegistrationScreenState extends State<DoctorRegistrationScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _usernameController = TextEditingController();
+  final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _locationController = TextEditingController();
   final _matriculeController = TextEditingController();
   final _passwordController = TextEditingController();
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  bool _isLoading = false;
 
   @override
   void dispose() {
-    _usernameController.dispose();
+    _nameController.dispose();
     _emailController.dispose();
     _locationController.dispose();
     _matriculeController.dispose();
@@ -32,47 +31,92 @@ class _DoctorRegistrationScreenState extends State<DoctorRegistrationScreen> {
     super.dispose();
   }
 
-  Future<void> _register() async {
+  Future<void> _registerDoctor() async {
     if (_formKey.currentState!.validate()) {
+      setState(() {
+        _isLoading = true;
+      });
       try {
-        // Créer un compte avec Firebase Authentication
-        UserCredential userCredential =
-            await _auth.createUserWithEmailAndPassword(
+        UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
           email: _emailController.text.trim(),
           password: _passwordController.text.trim(),
         );
-
-        // Récupérer l'utilisateur créé
         User? user = userCredential.user;
         if (user != null) {
-          // Stocker les informations dans Firestore
-          await _firestore.collection('users').doc(user.uid).set({
-            'userType': 'doctor',
-            'username': _usernameController.text.trim(),
+          await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+            'name': _nameController.text.trim(),
             'email': _emailController.text.trim(),
             'location': _locationController.text.trim(),
-            'matriculeMedical': _matriculeController.text.trim(),
+            'matricule': _matriculeController.text.trim(),
+            'userType': 'doctor',
+            'patients': [],
           });
-
-          // Rediriger vers la page d'accueil des docteurs
-          Navigator.pushReplacementNamed(context, '/doctor-main');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Inscription réussie ! Vous êtes maintenant connecté en tant que médecin.',
+                  style: TextStyle(color: Colors.white),
+                ),
+                backgroundColor: Colors.black,
+                duration: Duration(seconds: 3),
+              ),
+            );
+            Navigator.pushReplacementNamed(context, '/doctor-main');
+          }
         }
       } on FirebaseAuthException catch (e) {
-        String message;
-        if (e.code == 'email-already-in-use') {
-          message = 'Cet email est déjà utilisé.';
-        } else if (e.code == 'weak-password') {
-          message = 'Le mot de passe est trop faible.';
-        } else {
-          message = 'Erreur d’inscription : ${e.message}';
+        String errorMessage;
+        switch (e.code) {
+          case 'email-already-in-use':
+            errorMessage = 'Cet email est déjà utilisé par un autre compte.';
+            break;
+          case 'invalid-email':
+            errorMessage = 'L\'adresse email est invalide.';
+            break;
+          case 'weak-password':
+            errorMessage = 'Le mot de passe est trop faible. Utilisez au moins 6 caractères.';
+            break;
+          default:
+            errorMessage = 'Une erreur est survenue lors de l\'inscription. Veuillez réessayer.';
         }
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(message)),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                errorMessage,
+                style: const TextStyle(color: Colors.white),
+              ),
+              backgroundColor: Colors.redAccent,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur : $e')),
-        );
+        if (mounted) {
+          String errorMessage = 'Une erreur inattendue est survenue lors de l\'inscription. Veuillez réessayer.';
+          if (e.toString().contains('network')) {
+            errorMessage = 'Problème de connexion réseau. Veuillez vérifier votre connexion.';
+          } else if (e.toString().contains('permission-denied')) {
+            errorMessage = 'Vous n\'avez pas la permission d\'effectuer cette action.';
+          }
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                errorMessage,
+                style: const TextStyle(color: Colors.white),
+              ),
+              backgroundColor: Colors.redAccent,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
       }
     }
   }
@@ -81,97 +125,109 @@ class _DoctorRegistrationScreenState extends State<DoctorRegistrationScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       resizeToAvoidBottomInset: true,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(vertical: 16.0),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).primaryColor,
-                    borderRadius: BorderRadius.circular(16.0),
+      body: Container(
+        height: MediaQuery.of(context).size.height, // S’assure que le conteneur prend toute la hauteur
+        decoration: const BoxDecoration(
+          image: DecorationImage(
+            image: AssetImage('assets/images/background.png'),
+            fit: BoxFit.cover,
+          ),
+        ),
+        child: SafeArea(
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 40.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Image.asset(
+                    'assets/images/illustration.png',
+                    height: 200,
                   ),
-                  child: Center(
-                    child: Text(
-                      'REMEMBER Me',
-                      style: Theme.of(context).textTheme.headlineSmall,
+                  const SizedBox(height: 40.0),
+                  Text(
+                    'REMEMBER ME',
+                    style: Theme.of(context).textTheme.headlineSmall,
+                  ),
+                  const SizedBox(height: 40.0),
+                  Form(
+                    key: _formKey,
+                    child: Column(
+                      children: [
+                        CustomTextField(
+                          label: 'Nom d’utilisateur',
+                          controller: _nameController,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Veuillez entrer votre nom';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 16.0),
+                        CustomTextField(
+                          label: 'Email',
+                          controller: _emailController,
+                          keyboardType: TextInputType.emailAddress,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Veuillez entrer votre email';
+                            }
+                            if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(value)) {
+                              return 'Veuillez entrer un email valide';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 16.0),
+                        CustomTextField(
+                          label: 'Location',
+                          controller: _locationController,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Veuillez entrer votre localisation';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 16.0),
+                        CustomTextField(
+                          label: 'Matricule médical',
+                          controller: _matriculeController,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Veuillez entrer votre matricule médical';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 16.0),
+                        CustomTextField(
+                          label: 'Mot de passe',
+                          controller: _passwordController,
+                          obscureText: true,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Veuillez entrer votre mot de passe';
+                            }
+                            if (value.length < 6) {
+                              return 'Le mot de passe doit contenir au moins 6 caractères';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 24.0),
+                        _isLoading
+                            ? const CircularProgressIndicator(color: Colors.white)
+                            : CustomButton(
+                                text: 'ENREGISTRER',
+                                onPressed: _registerDoctor,
+                              ),
+                      ],
                     ),
                   ),
-                ),
-                const SizedBox(height: 16.0),
-                Form(
-                  key: _formKey,
-                  child: Column(
-                    children: [
-                      CustomTextField(
-                        label: 'user name',
-                        controller: _usernameController,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter your username';
-                          }
-                          return null;
-                        },
-                      ),
-                      CustomTextField(
-                        label: 'email',
-                        controller: _emailController,
-                        keyboardType: TextInputType.emailAddress,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter your email';
-                          }
-                          if (!RegExp(r'^[^@]+@[^@]+\.[^@]+')
-                              .hasMatch(value)) {
-                            return 'Please enter a valid email';
-                          }
-                          return null;
-                        },
-                      ),
-                      CustomTextField(
-                        label: 'Location',
-                        controller: _locationController,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter your location';
-                          }
-                          return null;
-                        },
-                      ),
-                      CustomTextField(
-                        label: 'Matricule medical',
-                        controller: _matriculeController,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter your medical matricule';
-                          }
-                          return null;
-                        },
-                      ),
-                      CustomTextField(
-                        label: 'Password',
-                        controller: _passwordController,
-                        obscureText: true,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter your password';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16.0),
-                      CustomButton(
-                        text: 'ENregistrer',
-                        onPressed: _register,
-                      ),
-                      const SizedBox(height: 16.0),
-                    ],
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
