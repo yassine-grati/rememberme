@@ -26,7 +26,7 @@ class RememberMeApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Remember me',
+      title: 'Remember Me',
       theme: ThemeData(
         primaryColor: const Color(0xFF1976D2),
         scaffoldBackgroundColor: Colors.white,
