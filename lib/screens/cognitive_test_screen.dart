@@ -1,9 +1,19 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:research_package/research_package.dart';
-import 'package:cognition_package/cognition_package.dart';
+import 'package:cognition_package/model.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:async';
+import '../widgets/gradient_background.dart';
+import 'results_screen.dart';
+
+// Classe pour encapsuler le résultat du test et son état
+class TestResult {
+  final RPTaskResult? result;
+  final bool isCompleted;
+
+  TestResult({this.result, required this.isCompleted});
+}
 
 class CognitiveTestScreen extends StatefulWidget {
   const CognitiveTestScreen({super.key});
@@ -13,14 +23,19 @@ class CognitiveTestScreen extends StatefulWidget {
 }
 
 class _CognitiveTestScreenState extends State<CognitiveTestScreen> {
-  String statusMessage = "Prêt à commencer";
-  String? resultJson;
-  Map<String, int>? scores;
   final _scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
+  final _navigatorKey = GlobalKey<NavigatorState>();
+  bool _isTestRunning = false;
 
   RPOrderedTask get cognitionTask => RPOrderedTask(
         identifier: "cognition_task",
         steps: [
+          RPInstructionStep(
+            identifier: 'intro',
+            title: 'Évaluation cognitive',
+            text: 'Vous allez passer une série de tests cognitifs pour évaluer différents domaines de votre cognition. '
+                'Cela peut prendre environ 20 à 30 minutes. Vous pouvez quitter à tout moment, et vos résultats partiels seront enregistrés.',
+          ),
           RPFlankerActivity(
             identifier: "flanker_test",
             lengthOfTest: 30,
@@ -30,336 +45,394 @@ class _CognitiveTestScreenState extends State<CognitiveTestScreen> {
             identifier: "tapping_test",
             lengthOfTest: 10,
           ),
+          RPTrailMakingActivity(
+            identifier: "trail_making_test",
+            trailType: TrailType.B,
+          ),
+          RPPictureSequenceMemoryActivity(
+            identifier: "picture_sequence_test",
+            numberOfTests: 3,
+            numberOfPics: 3,
+            lengthOfTest: 90,
+          ),
+          RPWordRecallActivity(
+            identifier: "word_recall_test",
+            numberOfTests: 5,
+            lengthOfTest: 90, 
+          ),
+          RPLetterTappingActivity(
+            identifier: "letter_tapping_test",
+          ),
+          RPPairedAssociatesLearningActivity(
+            identifier: "paired_associates_test",
+            maxTestDuration: 100,
+          ),
+          RPReactionTimeActivity(
+            identifier: "reaction_time_test",
+            lengthOfTest: 30,
+            switchInterval: 4,
+          ),
+          RPStroopEffectActivity(
+            identifier: "stroop_test",
+            lengthOfTest: 30,
+            displayTime: 1000,
+            delayTime: 750,
+          ),
+          RPCorsiBlockTappingActivity(
+            identifier: "corsi_block_test",
+          ),
+          RPRapidVisualInfoProcessingActivity(
+            identifier: "rapid_visual_test",
+            lengthOfTest: 60,
+            interval: 9,
+          ),
+          RPVisualArrayChangeActivity(
+            identifier: "visual_array_test",
+            numberOfTests: 5,
+            lengthOfTest: 1000,
+          ),
+          RPContinuousVisualTrackingActivity(
+            identifier: "visual_tracking_test",
+            lengthOfTest: 60,
+            amountOfTargets: 3, 
+          ),
+          RPDelayedRecallActivity(
+            identifier: "delayed_recall_test",
+            numberOfTests: 5,
+            lengthOfTest: 300,
+          ),
         ],
       );
 
-  Future<Map<String, int>> saveResultsToFirestore(RPTaskResult result) async {
+  int _parseToInt(dynamic value) {
+    if (value is int) return value;
+    if (value is double) return value.toInt();
+    if (value is String) return int.tryParse(value) ?? 0;
+    return 0;
+  }
+
+  Future<void> saveResultsToFirestore(RPTaskResult result, {bool completed = true}) async {
     try {
-      User? user = FirebaseAuth.instance.currentUser;
+      final user = FirebaseAuth.instance.currentUser;
       if (user == null) throw Exception('Utilisateur non connecté');
 
-      print("=== RAW RESULTS STRUCTURE ===");
-      result.results.forEach((key, value) => print("$key: ${value?.toString()}"));
+      const Map<String, String> scoreKeys = {
+        'flanker_test': 'score',
+        'tapping_test': 'Total taps',
+        'trail_making_test': 'score',
+        'picture_sequence_test': 'score',
+        'word_recall_test': 'score',
+        'letter_tapping_test': 'score',
+        'paired_associates_test': 'score',
+        'reaction_time_test': 'reactionTime',
+        'stroop_test': 'score',
+        'corsi_block_test': 'score',
+        'rapid_visual_test': 'score',
+        'visual_array_test': 'score',
+        'visual_tracking_test': 'score',
+        'delayed_recall_test': 'score',
+      };
 
-      int flankerScore = 0;
-      int tappingScore = 0;
+      Map<String, dynamic> scores = {};
 
-      for (var entry in result.results.entries) {
-        if (entry.value is RPStepResult) {
-          final stepResult = entry.value as RPStepResult;
+      for (final entry in result.results.entries) {
+        if (entry.value is RPActivityResult) {
+          final stepResult = entry.value as RPActivityResult;
+          final identifier = stepResult.identifier;
 
-          print("\n=== STEP ${stepResult.identifier} RESULTS ===");
-          stepResult.results.forEach((key, value) => print("$key: $value (${value.runtimeType})"));
+          if (identifier == 'intro') continue;
 
-          if (stepResult.identifier == "flanker_test") {
-            final resultMap = stepResult.results['result'] as Map<dynamic, dynamic>?;
-            if (resultMap != null) {
-              print("Flanker result map: $resultMap");
-              resultMap.forEach((key, value) => print("FLANKER KEY: $key, VALUE: $value (${value.runtimeType})"));
-              var rightSwipes = resultMap['right swipes'];
-              print("Raw right swipes value: $rightSwipes (${rightSwipes?.runtimeType})");
-              flankerScore = rightSwipes != null
-                  ? (rightSwipes is num
-                      ? rightSwipes.toInt()
-                      : rightSwipes is String
-                          ? int.tryParse(rightSwipes) ?? 0
-                          : 0)
-                  : 0;
-              print("Flanker score après assignation: $flankerScore");
+          print('Résultats pour $identifier : ${stepResult.results}');
+          final resultData = stepResult.results['result'];
+          if (resultData != null) {
+            if (resultData is Map<String, dynamic>) {
+              String scoreKey = scoreKeys[identifier] ?? 'score';
+              dynamic scoreValue = resultData[scoreKey] ?? resultData['score'] ?? 0;
+              scores[identifier] = _parseToInt(scoreValue);
+            } else if (resultData is int) {
+              scores[identifier] = resultData;
             } else {
-              print("No 'result' map found for Flanker test");
+              print('Format inattendu pour $identifier : $resultData');
+              scores[identifier] = 0;
             }
-          } else if (stepResult.identifier == "tapping_test") {
-            final resultMap = stepResult.results['result'] as Map<dynamic, dynamic>?;
-            if (resultMap != null) {
-              print("Tapping result map: $resultMap");
-              resultMap.forEach((key, value) => print("TAPPING KEY: $key, VALUE: $value (${value.runtimeType})"));
-              var totalTaps = resultMap['Total taps'];
-              print("Raw Total taps value: $totalTaps (${totalTaps?.runtimeType})");
-              tappingScore = totalTaps != null
-                  ? (totalTaps is num
-                      ? totalTaps.toInt()
-                      : totalTaps is String
-                          ? int.tryParse(totalTaps) ?? 0
-                          : 0)
-                  : 0;
-              print("Tapping score après assignation: $tappingScore");
-            } else {
-              print("No 'result' map found for Tapping test");
-            }
+          } else {
+            print('Aucun résultat trouvé pour $identifier');
           }
         }
       }
 
-      print("\n=== FINAL SCORES ===");
-      print("Flanker: $flankerScore");
-      print("Tapping: $tappingScore");
-
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .collection('cognitive_results')
-          .add({
-        'timestamp': Timestamp.now(),
-        'flanker_score': flankerScore,
-        'tapping_score': tappingScore,
-      });
-
-      print("Results successfully saved to Firestore");
-      return {
-        'flanker_score': flankerScore,
-        'tapping_score': tappingScore,
-      };
-    } catch (e) {
-      print('Erreur lors de la sauvegarde des résultats : $e');
-      throw e;
+      if (scores.isNotEmpty) {
+        print('Sauvegarde des scores dans Firestore : $scores');
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .collection('cognitive_results')
+            .add({
+          'timestamp': Timestamp.now(),
+          'scores': scores,
+          'completed': completed,
+        });
+      } else {
+        print('Aucun score à sauvegarder');
+        throw Exception('Aucun score généré pour sauvegarde');
+      }
+    } catch (e, stackTrace) {
+      print('Erreur lors de la sauvegarde dans Firestore : $e');
+      print('Stack trace : $stackTrace');
+      rethrow;
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    print('Building CognitiveTestScreen, status: $statusMessage');
-    return Scaffold(
-      body: ScaffoldMessenger(
-        key: _scaffoldMessengerKey,
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Center(
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Text(
-                    'Test Cognitif',
-                    style: TextStyle(fontSize: 24.0, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    statusMessage,
-                    style: const TextStyle(fontSize: 18.0),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 30),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
-                      textStyle: const TextStyle(fontSize: 18),
+  Future<TestResult> runCognitiveTest(BuildContext context) async {
+    final completer = Completer<TestResult>();
+
+    try {
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => WillPopScope(
+            onWillPop: () async {
+              if (!_isTestRunning) return true;
+              completer.complete(TestResult(result: null, isCompleted: false));
+              return true;
+            },
+            child: Theme(
+              data: Theme.of(context).copyWith(
+                scaffoldBackgroundColor: Colors.transparent,
+                appBarTheme: const AppBarTheme(
+                  backgroundColor: Colors.transparent,
+                  elevation: 0,
+                  titleTextStyle: TextStyle(color: Colors.white, fontSize: 20),
+                  iconTheme: IconThemeData(color: Colors.white),
+                ),
+                textTheme: const TextTheme(
+                  bodyLarge: TextStyle(color: Colors.white),
+                  bodyMedium: TextStyle(color: Colors.white),
+                  labelLarge: TextStyle(color: Colors.white),
+                ),
+                elevatedButtonTheme: ElevatedButtonThemeData(
+                  style: ElevatedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    backgroundColor: const Color(0xFF6F35A5),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(25.0),
                     ),
-                    onPressed: () async {
-                      try {
-                        print('Starting cognitive test...');
-                        setState(() {
-                          statusMessage = "Test en cours...";
-                          resultJson = null;
-                          scores = null;
-                        });
-
-                        final result = await Navigator.of(context).push<RPTaskResult?>(
-                          MaterialPageRoute(
-                            builder: (context) {
-                              print('Pushing RPUITask route');
-                              return SafeArea(
-                                child: RPUITask(
-                                  task: cognitionTask,
-                                  onSubmit: (result) {
-                                    print('onSubmit called with result: ${result.toJson()}');
-                                    Navigator.pop(context, result);
-                                  },
-                                  onCancel: (result) {
-                                    print('onCancel called with result: $result');
-                                    Navigator.pop(context, null);
-                                  },
-                                ),
-                              );
-                            },
-                          ),
-                        );
-
-                        print('Result returned from Navigator.push: $result');
-
-                        if (!mounted) {
-                          print('State not mounted, skipping UI update');
-                          return;
-                        }
-
-                        await Future.delayed(const Duration(milliseconds: 100)); // Let UI settle
-
-                        if (result != null) {
-                          try {
-                            print('Processing results...');
-                            final resultScores = await saveResultsToFirestore(result);
-                            setState(() {
-                              statusMessage = "Test terminé !";
-                              resultJson = const JsonEncoder.withIndent('  ').convert(result.toJson());
-                              scores = resultScores;
-                            });
-                            _scaffoldMessengerKey.currentState?.showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  'Résultats enregistrés ! Flanker: ${resultScores['flanker_score']}, Tapping: ${resultScores['tapping_score']}',
-                                ),
-                                duration: const Duration(seconds: 3),
-                              ),
-                            );
-                          } catch (e) {
-                            print('Error during result processing: $e');
-                            setState(() {
-                              statusMessage = "Erreur lors de l'enregistrement";
-                            });
-                            _scaffoldMessengerKey.currentState?.showSnackBar(
-                              SnackBar(
-                                content: Text('Erreur d\'enregistrement: ${e.toString()}'),
-                                duration: const Duration(seconds: 3),
-                              ),
-                            );
-                          }
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    textStyle: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                    elevation: 5,
+                  ),
+                ),
+                textButtonTheme: TextButtonThemeData(
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    textStyle: const TextStyle(fontSize: 16),
+                  ),
+                ),
+              ),
+              child: GradientBackground(
+                child: Scaffold(
+                  backgroundColor: Colors.transparent,
+                  appBar: AppBar(
+                    title: const Text('Test en cours'),
+                    leading: BackButton(
+                      onPressed: () {
+                        if (_isTestRunning) {
+                          completer.complete(TestResult(result: null, isCompleted: false));
+                          Navigator.of(context).pop();
                         } else {
-                          print('Test cancelled');
-                          setState(() {
-                            statusMessage = "Test annulé";
-                          });
-                          _scaffoldMessengerKey.currentState?.showSnackBar(
-                            const SnackBar(
-                              content: Text('Test annulé'),
-                              duration: Duration(seconds: 2),
-                            ),
-                          );
+                          Navigator.of(context).pop();
                         }
-                      } catch (e) {
-                        print('Erreur lors de l\'exécution du test : $e');
-                        if (mounted) {
-                          setState(() {
-                            statusMessage = "Erreur lors du test";
-                          });
-                          _scaffoldMessengerKey.currentState?.showSnackBar(
-                            const SnackBar(
-                              content: Text('Erreur lors du test. Veuillez réessayer.'),
-                              duration: const Duration(seconds: 3),
-                            ),
-                          );
-                        }
-                      }
-                    },
-                    child: const Text('Commencer le Test'),
+                      },
+                    ),
                   ),
-                  if (resultJson != null) ...[
-                    const SizedBox(height: 20),
-                    const Text(
-                      'Résultat Brut:',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 10),
-                    Container(
-                      padding: const EdgeInsets.all(8.0),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey),
-                        borderRadius: BorderRadius.circular(4.0),
-                      ),
-                      child: Text(
-                        resultJson!,
-                        style: const TextStyle(fontSize: 14, fontFamily: 'monospace'),
-                        textAlign: TextAlign.left,
+                  body: SingleChildScrollView(
+                    child: SizedBox(
+                      height: MediaQuery.of(context).size.height,
+                      child: RPUITask(
+                        task: cognitionTask,
+                        onSubmit: (res) {
+                          print('Test soumis avec succès : $res');
+                          completer.complete(TestResult(result: res, isCompleted: true));
+                        },
+                        onCancel: (res) {
+                          print('Test annulé : $res');
+                          completer.complete(TestResult(result: res, isCompleted: false));
+                        },
                       ),
                     ),
-                  ],
-                  if (scores != null) ...[
-                    const SizedBox(height: 20),
-                    const Text(
-                      'Scores:',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      'Flanker: ${scores!['flanker_score']}\nTapping: ${scores!['tapping_score']}',
-                      style: const TextStyle(fontSize: 16),
-                    ),
-                  ],
-                ],
+                  ),
+                ),
               ),
             ),
           ),
         ),
-      ),
-    );
+      );
+    } catch (e, stackTrace) {
+      print('Erreur lors de l\'exécution de runCognitiveTest : $e');
+      print('Stack trace : $stackTrace');
+      completer.complete(TestResult(result: null, isCompleted: false));
+    }
+
+    return completer.future;
   }
-}
-
-class ResultScreen extends StatelessWidget {
-  final String resultJson;
-  final Map<String, int> scores;
-
-  const ResultScreen({
-    super.key,
-    required this.resultJson,
-    required this.scores,
-  });
 
   @override
   Widget build(BuildContext context) {
-    print('ResultScreen built with scores: $scores');
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Résultats du Test'),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Résultat Brut:',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 10),
-              Container(
-                padding: const EdgeInsets.all(8.0),
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey),
-                  borderRadius: BorderRadius.circular(4.0),
-                ),
-                child: Text(
-                  resultJson,
-                  style: const TextStyle(fontSize: 14, fontFamily: 'monospace'),
-                  textAlign: TextAlign.left,
-                ),
-              ),
-              const SizedBox(height: 20),
-              const Text(
-                'Scores:',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                'Flanker: ${scores['flanker_score']}\nTapping: ${scores['tapping_score']}',
-                style: const TextStyle(fontSize: 16),
-              ),
-              const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+    return WillPopScope(
+      onWillPop: () async {
+        print('WillPopScope triggered, preventing pop while test is running: $_isTestRunning');
+        return !_isTestRunning;
+      },
+      child: GradientBackground(
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
+          appBar: AppBar(
+            title: const Text('Cognitive Test'),
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+          ),
+          body: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  ElevatedButton(
-                    onPressed: () {
-                      print('Retour button pressed');
-                      Navigator.pop(context);
-                    },
-                    child: const Text('Retour'),
+                  const Text(
+                    'Take a Cognitive Test',
+                    style: TextStyle(
+                      fontSize: 24.0,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
                   ),
+                  const SizedBox(height: 16.0),
                   ElevatedButton(
-                    onPressed: () {
-                      print('Réessayer button pressed');
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const CognitiveTestScreen(),
-                        ),
-                      );
+                    onPressed: () async {
+                      try {
+                        setState(() {
+                          _isTestRunning = true;
+                        });
+
+                        final testResult = await runCognitiveTest(context);
+                        print('Résultat du test : isCompleted=${testResult.isCompleted}, result=${testResult.result}');
+
+                        if (testResult.isCompleted && testResult.result != null) {
+                          // Extraire les scores pour les passer à ResultsScreen
+                          final scores = <String, dynamic>{};
+                          try {
+                            for (final entry in testResult.result!.results.entries) {
+                              if (entry.value is RPActivityResult) {
+                                final stepResult = entry.value as RPActivityResult;
+                                final identifier = stepResult.identifier;
+                                if (identifier == 'intro') continue;
+                                final resultData = stepResult.results['result'];
+                                if (resultData != null) {
+                                  if (resultData is Map<String, dynamic>) {
+                                    final score = resultData['score'] ?? resultData['Total taps'] ?? resultData['reactionTime'] ?? 0;
+                                    scores[identifier] = _parseToInt(score);
+                                  } else if (resultData is int) {
+                                    scores[identifier] = resultData;
+                                  } else {
+                                    print('Format inattendu pour $identifier : $resultData');
+                                    scores[identifier] = 0;
+                                  }
+                                } else {
+                                  print('Aucun resultData pour $identifier');
+                                }
+                              }
+                            }
+                            print('Scores extraits : $scores');
+                          } catch (e) {
+                            print('Erreur lors de l\'extraction des scores : $e');
+                            throw Exception('Erreur lors de l\'extraction des scores : $e');
+                          }
+
+                          // Naviguer vers ResultsScreen
+                          try {
+                            if (mounted) {
+                              await Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => ResultsScreen(scores: scores),
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            print('Erreur lors de la navigation vers ResultsScreen : $e');
+                            throw Exception('Erreur lors de la navigation : $e');
+                          }
+
+                          // Sauvegarder les résultats dans Firestore
+                          try {
+                            await saveResultsToFirestore(testResult.result!, completed: true);
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Résultats enregistrés !',
+                                    style: TextStyle(color: Colors.white),
+                                  ),
+                                  backgroundColor: Colors.black,
+                                  duration: Duration(seconds: 3),
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            print('Erreur lors de la sauvegarde des résultats : $e');
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'Erreur lors de la sauvegarde : $e',
+                                    style: const TextStyle(color: Colors.white),
+                                  ),
+                                  backgroundColor: Colors.black,
+                                  duration: const Duration(seconds: 3),
+                                ),
+                              );
+                            }
+                          }
+                        } else {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Test annulé.',
+                                  style: TextStyle(color: Colors.white),
+                                ),
+                                backgroundColor: Colors.black,
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                          }
+                        }
+                      } catch (e) {
+                        print('Erreur générale dans le bloc principal : $e');
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Erreur lors du test : $e. Veuillez réessayer.',
+                                style: const TextStyle(color: Colors.white),
+                              ),
+                              backgroundColor: Colors.black,
+                              duration: const Duration(seconds: 3),
+                            ),
+                          );
+                        }
+                      } finally {
+                        setState(() {
+                          _isTestRunning = false;
+                        });
+                      }
                     },
-                    child: const Text('Réessayer'),
+                    child: const Text('Start Test'),
                   ),
                 ],
               ),
-            ],
+            ),
           ),
         ),
       ),
