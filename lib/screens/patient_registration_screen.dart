@@ -18,6 +18,11 @@ class _PatientRegistrationScreenState extends State<PatientRegistrationScreen> {
   final _ageController = TextEditingController();
   final _educationController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _physicalActivityController = TextEditingController();
+  final _sleepQualityController = TextEditingController();
+  String _gender = 'Homme'; // Valeur par défaut
+  bool _familyHistoryAlzheimers = false;
+  bool _diabetes = false;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   bool _isLoading = false;
 
@@ -28,6 +33,8 @@ class _PatientRegistrationScreenState extends State<PatientRegistrationScreen> {
     _ageController.dispose();
     _educationController.dispose();
     _passwordController.dispose();
+    _physicalActivityController.dispose();
+    _sleepQualityController.dispose();
     super.dispose();
   }
 
@@ -43,11 +50,21 @@ class _PatientRegistrationScreenState extends State<PatientRegistrationScreen> {
         );
         User? user = userCredential.user;
         if (user != null) {
+          // Map family history to integer: false (Non) -> 0, true (Oui) -> 1
+          int familyHistoryCode = _familyHistoryAlzheimers ? 1 : 0;
+          // Map diabetes to integer: false (Non) -> 0, true (Oui) -> 1
+          int diabetesCode = _diabetes ? 1 : 0;
+
           await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
             'name': _nameController.text.trim(),
             'email': _emailController.text.trim(),
             'age': int.tryParse(_ageController.text.trim()) ?? 0,
-            'education': _educationController.text.trim(),
+            'education_years': int.tryParse(_educationController.text.trim()) ?? 0,
+            'gender': _gender, // Store gender as string
+            'physical_activity_hours_per_week': double.tryParse(_physicalActivityController.text.trim()) ?? 0.0,
+            'sleep_quality_hours_per_night': double.tryParse(_sleepQualityController.text.trim()) ?? 0.0,
+            'family_history_alzheimers_code': familyHistoryCode,
+            'diabetes_code': diabetesCode,
             'userType': 'patient',
           });
           Navigator.pushReplacementNamed(context, '/main');
@@ -171,15 +188,116 @@ class _PatientRegistrationScreenState extends State<PatientRegistrationScreen> {
                           },
                         ),
                         const SizedBox(height: 16.0),
-                        CustomTextField(
-                          label: 'Niveau d’éducation',
-                          controller: _educationController,
+                        DropdownButtonFormField<String>(
+                          value: _gender,
+                          decoration: InputDecoration(
+                            labelText: 'Genre',
+                            filled: true,
+                            fillColor: Colors.white.withOpacity(0.2),
+                            labelStyle: const TextStyle(color: Colors.white70),
+                            enabledBorder: OutlineInputBorder(
+                              borderSide: const BorderSide(color: Colors.white54),
+                              borderRadius: BorderRadius.circular(12.0),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderSide: const BorderSide(color: Colors.white),
+                              borderRadius: BorderRadius.circular(12.0),
+                            ),
+                          ),
+                          dropdownColor: Colors.black87,
+                          style: const TextStyle(color: Colors.white),
+                          items: ['Homme', 'Femme', 'Autre']
+                              .map((gender) => DropdownMenuItem(
+                                    value: gender,
+                                    child: Text(gender),
+                                  ))
+                              .toList(),
+                          onChanged: (value) {
+                            setState(() {
+                              _gender = value!;
+                            });
+                          },
                           validator: (value) {
                             if (value == null || value.isEmpty) {
-                              return 'Veuillez entrer votre niveau d’éducation';
+                              return 'Veuillez sélectionner votre genre';
                             }
                             return null;
                           },
+                        ),
+                        const SizedBox(height: 16.0),
+                        CustomTextField(
+                          label: 'Années d\'études',
+                          controller: _educationController,
+                          keyboardType: TextInputType.number,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Veuillez entrer le nombre d\'années d\'études';
+                            }
+                            if (int.tryParse(value) == null) {
+                              return 'Veuillez entrer un nombre valide';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 16.0),
+                        CustomTextField(
+                          label: 'Activité physique (heures/semaine)',
+                          controller: _physicalActivityController,
+                          keyboardType: TextInputType.numberWithOptions(decimal: true),
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Veuillez entrer vos heures d\'activité physique';
+                            }
+                            if (double.tryParse(value) == null) {
+                              return 'Veuillez entrer un nombre valide';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 16.0),
+                        CustomTextField(
+                          label: 'Qualité du sommeil (heures/nuit)',
+                          controller: _sleepQualityController,
+                          keyboardType: TextInputType.numberWithOptions(decimal: true),
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Veuillez entrer vos heures de sommeil par nuit';
+                            }
+                            if (double.tryParse(value) == null) {
+                              return 'Veuillez entrer un nombre valide';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 16.0),
+                        SwitchListTile(
+                          title: const Text(
+                            'Antécédents familiaux d\'Alzheimer',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                          value: _familyHistoryAlzheimers,
+                          onChanged: (value) {
+                            setState(() {
+                              _familyHistoryAlzheimers = value;
+                            });
+                          },
+                          activeColor: Colors.white,
+                          inactiveTrackColor: Colors.white54,
+                        ),
+                        const SizedBox(height: 16.0),
+                        SwitchListTile(
+                          title: const Text(
+                            'Diabète',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                          value: _diabetes,
+                          onChanged: (value) {
+                            setState(() {
+                              _diabetes = value;
+                            });
+                          },
+                          activeColor: Colors.white,
+                          inactiveTrackColor: Colors.white54,
                         ),
                         const SizedBox(height: 16.0),
                         CustomTextField(

@@ -17,26 +17,20 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _checkUserStatus() async {
-    await Future.delayed(
-      const Duration(seconds: 2),
-    ); // Délai pour afficher l'écran de démarrage
+    await Future.delayed(const Duration(seconds: 2)); // Délai pour afficher l'écran de démarrage
 
     try {
       User? user = FirebaseAuth.instance.currentUser;
 
       if (user != null) {
-        DocumentSnapshot userDoc =
-            await FirebaseFirestore.instance
-                .collection('users')
-                .doc(user.uid)
-                .get();
+        DocumentSnapshot userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
 
         if (userDoc.exists && userDoc.data() != null) {
-          Map<String, dynamic> userData =
-              userDoc.data() as Map<String, dynamic>;
-          String userType =
-              userData['userType'] ??
-              'patient'; // Par défaut, considérer comme patient
+          Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
+          String userType = userData['userType'] ?? 'patient'; // Par défaut, considérer comme patient
           if (mounted) {
             if (userType == 'doctor') {
               Navigator.pushReplacementNamed(context, '/doctor-main');
@@ -76,7 +70,7 @@ class _SplashScreenState extends State<SplashScreen> {
         ),
         child: const Center(
           child: Text(
-            'REMEMBER me',
+            'REMEMBER ME',
             style: TextStyle(
               fontSize: 36.0,
               fontWeight: FontWeight.bold,

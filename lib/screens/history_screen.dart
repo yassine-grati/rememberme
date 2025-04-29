@@ -68,6 +68,19 @@ class HistoryScreen extends StatelessWidget {
                 final timestamp = (data['timestamp'] as Timestamp).toDate();
                 final scores = data['scores'] as Map<String, dynamic>? ?? {};
                 final completed = data['completed'] as bool? ?? true;
+                final testType = data['testType']?.toString() ?? 'Inconnu';
+                final testName = data['testName']?.toString() ?? '';
+                final category = data['category']?.toString() ?? 'Inconnu';
+
+                // Déterminer le titre en fonction du type de test
+                String displayTitle;
+                if (testType == 'Complet') {
+                  displayTitle = 'Test Complet';
+                } else if (testType == 'Catégorie') {
+                  displayTitle = 'Test de $category';
+                } else {
+                  displayTitle = testName.isNotEmpty ? testName : 'Test Individuel';
+                }
 
                 return Card(
                   color: Colors.white.withOpacity(0.1),
@@ -78,11 +91,11 @@ class HistoryScreen extends StatelessWidget {
                   margin: const EdgeInsets.only(bottom: 16.0),
                   child: ListTile(
                     title: Text(
-                      'Test - ${timestamp.toLocal()}',
+                      displayTitle,
                       style: const TextStyle(color: Colors.white),
                     ),
                     subtitle: Text(
-                      completed ? 'Complété' : 'Incomplet',
+                      '${timestamp.toLocal()} | ${completed ? 'Complété' : 'Incomplet'}',
                       style: const TextStyle(color: Colors.white70),
                     ),
                     onTap: () {
@@ -91,13 +104,27 @@ class HistoryScreen extends StatelessWidget {
                         builder: (context) => AlertDialog(
                           backgroundColor: const Color(0xFF1976D2).withOpacity(0.9),
                           title: Text(
-                            'Détails du test - ${timestamp.toLocal()}',
+                            'Détails du test - $displayTitle',
                             style: const TextStyle(color: Colors.white),
                           ),
                           content: SingleChildScrollView(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
+                                Text(
+                                  'Date : ${timestamp.toLocal()}',
+                                  style: const TextStyle(color: Colors.white),
+                                ),
+                                if (testType != 'Individuel')
+                                  Text(
+                                    'Catégorie : $category',
+                                    style: const TextStyle(color: Colors.white),
+                                  ),
+                                Text(
+                                  'Statut : ${completed ? 'Complété' : 'Incomplet'}',
+                                  style: const TextStyle(color: Colors.white),
+                                ),
+                                const SizedBox(height: 16),
                                 const Text(
                                   'Scores :',
                                   style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
@@ -120,7 +147,7 @@ class HistoryScreen extends StatelessWidget {
                                       ],
                                     ),
                                   );
-                                }),
+                                }).toList(),
                               ],
                             ),
                           ),
