@@ -70,7 +70,7 @@ class _SplashScreenState extends State<SplashScreen> {
         ),
         child: const Center(
           child: Text(
-            'REMEMBER Me',
+            'REMEMBER ME',
             style: TextStyle(
               fontSize: 36.0,
               fontWeight: FontWeight.bold,
