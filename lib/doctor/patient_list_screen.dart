@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'patient_history_screen.dart';
-import '../widgets/gradient_background.dart';
+import '../shared/widgets/gradient_background.dart';
 
 class PatientListScreen extends StatelessWidget {
   const PatientListScreen({super.key});

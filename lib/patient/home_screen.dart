@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../screens/cognitive_test_screen.dart';
+import 'cognitive_test_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -204,6 +204,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     _buildCategorySection('Rappel'),
                     _buildCategorySection('Langage'),
                     _buildCategorySection('Perception'),
+                    _buildCategorySection('Localisation'),
                   ],
                 ),
               ),

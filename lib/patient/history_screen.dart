@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../widgets/gradient_background.dart';
+import '../shared/widgets/gradient_background.dart';
 
 class HistoryScreen extends StatelessWidget {
   const HistoryScreen({super.key});
