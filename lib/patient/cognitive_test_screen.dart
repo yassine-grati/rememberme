@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:rememberme/tests/logic/quiz_activity.dart';
 import 'package:research_package/research_package.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:async';
-import '../widgets/gradient_background.dart';
+import '../shared/widgets/gradient_background.dart';
 import 'results_screen.dart';
-import '../tests/cognitive_tests.dart';
+import '../tests/logic/cognitive_tests.dart';
 
 // Classe pour encapsuler le résultat du test et son état
 class TestResult {
@@ -33,6 +34,7 @@ class _CognitiveTestScreenState extends State<CognitiveTestScreen> {
   bool _isTestRunning = false;
 
   RPOrderedTask _buildTask(String identifier, String title, String introText, List<RPStep> steps) {
+    print("Building task $identifier with steps: ${steps.map((s) => s.identifier).toList()}");
     return RPOrderedTask(
       identifier: identifier,
       steps: [
@@ -52,13 +54,38 @@ class _CognitiveTestScreenState extends State<CognitiveTestScreen> {
   }
 
   RPOrderedTask _buildCompleteCognitionTask() {
-    final tests = CognitiveTests.getAllTests();
+    // Ordre des catégories : Enregistrement, Attention et Calcul, Rappel, Langage, Localisation
+    final List<String> orderedCategories = [
+      'Enregistrement',
+      'Attention et Calcul',
+      'Rappel',
+      'Langage',
+      'Localisation'
+    ];
+
+    // Liste pour stocker les tests uniques dans l'ordre
+    final List<RPStep> orderedTests = [];
+    final Set<String> addedTestIdentifiers = {};
+
+    // Parcourir les catégories dans l'ordre
+    for (var category in orderedCategories) {
+      final tests = CognitiveTests.getTestsForCategory(category);
+      for (var test in tests) {
+        if (!addedTestIdentifiers.contains(test.identifier)) {
+          orderedTests.add(test as RPStep);
+          addedTestIdentifiers.add(test.identifier);
+        }
+      }
+    }
+
+    print("Complete cognition task includes tests: ${orderedTests.map((t) => t.identifier).toList()}");
+
     return _buildTask(
       "cognition_task_complete",
       'Évaluation Cognitive Complète',
       'Vous allez passer une série de tests cognitifs pour évaluer différents domaines de votre cognition. '
           'Cela peut prendre environ 20 à 30 minutes. Vous pouvez quitter à tout moment, et vos résultats partiels seront enregistrés.',
-      tests.cast<RPStep>(),
+      orderedTests,
     );
   }
 
@@ -108,6 +135,7 @@ class _CognitiveTestScreenState extends State<CognitiveTestScreen> {
         'visual_array_test': 'score',
         'visual_tracking_test': 'score',
         'delayed_recall_test': 'score',
+        'localisation_quiz': 'score',
       };
 
       Map<String, dynamic> scores = {};
@@ -117,7 +145,7 @@ class _CognitiveTestScreenState extends State<CognitiveTestScreen> {
           final identifier = stepResult.identifier;
           if (identifier.startsWith('intro') || identifier.startsWith('completion')) continue;
 
-          final resultData = stepResult.results['result'];
+          final resultData = stepResult.results['result'] ?? stepResult.results['score'];
           if (resultData != null) {
             if (resultData is Map<String, dynamic>) {
               String scoreKey = scoreKeys[identifier] ?? 'score';
@@ -130,10 +158,12 @@ class _CognitiveTestScreenState extends State<CognitiveTestScreen> {
         }
       }
 
-      // Si aucun score n'est généré, retourner false sans lever d'exception
       if (scores.isEmpty) {
         return false;
       }
+
+      // Calculer le score MMSE uniquement pour le test complet
+      int mmseScore = testType == 'Complet' ? CognitiveTests.calculateTotalMMSEScore(scores) : 0;
 
       await FirebaseFirestore.instance
           .collection('users')
@@ -142,6 +172,7 @@ class _CognitiveTestScreenState extends State<CognitiveTestScreen> {
           .add({
         'timestamp': Timestamp.now(),
         'scores': scores,
+        'mmseScore': mmseScore,
         'completed': completed,
         'category': widget.isCompleteTest ? 'Complet' : (widget.category.isNotEmpty ? widget.category : 'Individuel'),
         'testType': testType ?? (widget.isCompleteTest ? 'Complet' : (widget.category.isNotEmpty ? 'Catégorie' : 'Individuel')),
@@ -157,74 +188,114 @@ class _CognitiveTestScreenState extends State<CognitiveTestScreen> {
 
   Future<TestResult> _runCognitiveTest(BuildContext context, RPOrderedTask task) async {
     final completer = Completer<TestResult>();
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => WillPopScope(
-          onWillPop: () async {
-            if (!_isTestRunning) return true;
-            completer.complete(TestResult(result: null, isCompleted: false));
-            return true;
-          },
-          child: Theme(
-            data: Theme.of(context).copyWith(
-              scaffoldBackgroundColor: Colors.transparent,
-              appBarTheme: const AppBarTheme(
+    bool hasCompleted = false;
+
+    void complete(TestResult result) {
+      if (!hasCompleted && !completer.isCompleted) {
+        hasCompleted = true;
+        completer.complete(result);
+      }
+    }
+
+    // Gestion spéciale pour le Localisation Quiz
+    if (task.steps.any((step) => step.identifier == 'localisation_quiz')) {
+      final quizStep = task.steps.firstWhere((step) => step.identifier == 'localisation_quiz') as RPQuizActivity;
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => GradientBackground(
+            child: Scaffold(
+              backgroundColor: Colors.transparent,
+              appBar: AppBar(
+                title: const Text('Localisation Quiz'),
                 backgroundColor: Colors.transparent,
                 elevation: 0,
-                titleTextStyle: TextStyle(color: Colors.white, fontSize: 20),
-                iconTheme: IconThemeData(color: Colors.white),
+                titleTextStyle: const TextStyle(color: Colors.white, fontSize: 20),
+                iconTheme: const IconThemeData(color: Colors.white),
               ),
-              textTheme: const TextTheme(
-                bodyLarge: TextStyle(color: Colors.white),
-                bodyMedium: TextStyle(color: Colors.white),
-                labelLarge: TextStyle(color: Colors.white),
-              ),
-              elevatedButtonTheme: ElevatedButtonThemeData(
-                style: ElevatedButton.styleFrom(
-                  foregroundColor: Colors.white,
-                  backgroundColor: const Color(0xFF6F35A5),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(25.0),
-                  ),
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  textStyle: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                  elevation: 5,
-                ),
-              ),
-              textButtonTheme: TextButtonThemeData(
-                style: TextButton.styleFrom(
-                  foregroundColor: Colors.white,
-                  textStyle: const TextStyle(fontSize: 16),
-                ),
-              ),
+              body: quizStep.createWidget(context, (result) {
+                final taskResult = RPTaskResult(identifier: task.identifier);
+                taskResult.results[result.identifier] = result;
+                complete(TestResult(result: taskResult, isCompleted: true));
+                Navigator.of(context).pop();
+              }),
             ),
-            child: GradientBackground(
-              child: Scaffold(
-                backgroundColor: Colors.transparent,
-                appBar: AppBar(
-                  title: const Text('Test en cours'),
-                  leading: BackButton(
-                    onPressed: () {
-                      if (_isTestRunning) {
-                        completer.complete(TestResult(result: null, isCompleted: false));
-                        Navigator.of(context).pop();
-                      } else {
-                        Navigator.of(context).pop();
-                      }
-                    },
+          ),
+        ),
+      );
+    } else {
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => WillPopScope(
+            onWillPop: () async {
+              if (!_isTestRunning) return true;
+              complete(TestResult(result: null, isCompleted: false));
+              return true;
+            },
+            child: Theme(
+              data: Theme.of(context).copyWith(
+                scaffoldBackgroundColor: Colors.transparent,
+                appBarTheme: const AppBarTheme(
+                  backgroundColor: Colors.transparent,
+                  elevation: 0,
+                  titleTextStyle: TextStyle(color: Colors.white, fontSize: 20),
+                  iconTheme: IconThemeData(color: Colors.white),
+                ),
+                textTheme: const TextTheme(
+                  bodyLarge: TextStyle(color: Colors.white),
+                  bodyMedium: TextStyle(color: Colors.white),
+                  labelLarge: TextStyle(color: Colors.white),
+                ),
+                elevatedButtonTheme: ElevatedButtonThemeData(
+                  style: ElevatedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    backgroundColor: const Color(0xFF6F35A5),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(25.0),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    textStyle: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                    elevation: 5,
                   ),
                 ),
-                body: SingleChildScrollView(
-                  child: SizedBox(
-                    height: MediaQuery.of(context).size.height,
-                    child: RPUITask(
-                      task: task,
-                      onSubmit: (res) => completer.complete(TestResult(result: res, isCompleted: true)),
-                      onCancel: (res) => completer.complete(TestResult(result: res, isCompleted: false)),
+                textButtonTheme: TextButtonThemeData(
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    textStyle: const TextStyle(fontSize: 16),
+                  ),
+                ),
+              ),
+              child: GradientBackground(
+                child: Scaffold(
+                  backgroundColor: Colors.transparent,
+                  appBar: AppBar(
+                    title: const Text('Test en cours'),
+                    leading: BackButton(
+                      onPressed: () {
+                        if (_isTestRunning) {
+                          complete(TestResult(result: null, isCompleted: false));
+                          Navigator.of(context).pop();
+                        } else {
+                          Navigator.of(context).pop();
+                        }
+                      },
+                    ),
+                  ),
+                  body: SingleChildScrollView(
+                    child: SizedBox(
+                      height: MediaQuery.of(context).size.height,
+                      child: RPUITask(
+                        task: task,
+                        onSubmit: (res) { 
+                          complete(TestResult(result: res, isCompleted: true));
+                          Navigator.of(context).pop();},
+                        onCancel: (res) { 
+                          complete(TestResult(result: res, isCompleted: false));
+                          Navigator.of(context).pop();},
+                      ),
                     ),
                   ),
                 ),
@@ -232,37 +303,42 @@ class _CognitiveTestScreenState extends State<CognitiveTestScreen> {
             ),
           ),
         ),
-      ),
-    );
+      );
+    }
+
     return completer.future;
   }
 
   Future<void> _handleTestResult(BuildContext context, TestResult testResult, {String? testType, String? testName}) async {
-    try {
-      if (testResult.isCompleted && testResult.result != null) {
-        final scores = <String, dynamic>{};
-        for (final entry in testResult.result!.results.entries) {
-          if (entry.value is RPActivityResult) {
-            final stepResult = entry.value as RPActivityResult;
-            final identifier = stepResult.identifier;
-            if (identifier.startsWith('intro') || identifier.startsWith('completion')) continue;
-            final resultData = stepResult.results['result'];
-            if (resultData != null) {
-              if (resultData is Map<String, dynamic>) {
-                final score = resultData['score'] ?? resultData['Total taps'] ?? resultData['reactionTime'] ?? 0;
-                scores[identifier] = _parseToInt(score);
-              } else if (resultData is int) {
-                scores[identifier] = resultData;
-              }
+  try {
+    if (testResult.isCompleted && testResult.result != null) {
+      final scores = <String, dynamic>{};
+      for (final entry in testResult.result!.results.entries) {
+        if (entry.value is RPActivityResult) {
+          final stepResult = entry.value as RPActivityResult;
+          final identifier = stepResult.identifier;
+          if (identifier.startsWith('intro') || identifier.startsWith('completion')) continue;
+          final resultData = stepResult.results['result'] ?? stepResult.results['score'];
+          if (resultData != null) {
+            if (resultData is Map<String, dynamic>) {
+              final score = resultData['score'] ?? resultData['Total taps'] ?? resultData['reactionTime'] ?? 0;
+              scores[identifier] = _parseToInt(score);
+            } else if (resultData is int) {
+              scores[identifier] = resultData;
             }
           }
         }
+      }
 
+      // Calculer le score MMSE pour le test complet
+      final mmseScore = testType == 'Complet' ? CognitiveTests.calculateTotalMMSEScore(scores) : null;
+
+      if (mounted) {
+        await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => ResultsScreen(scores: scores, mmseScore: mmseScore)),
+        );
+        final saved = await _saveResultsToFirestore(testResult.result!, completed: true, testType: testType, testName: testName);
         if (mounted) {
-          await Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => ResultsScreen(scores: scores)),
-          );
-          final saved = await _saveResultsToFirestore(testResult.result!, completed: true, testType: testType, testName: testName);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
@@ -274,78 +350,91 @@ class _CognitiveTestScreenState extends State<CognitiveTestScreen> {
             ),
           );
         }
-      } else if (testResult.result != null) {
-        final saved = await _saveResultsToFirestore(testResult.result!, completed: false, testType: testType, testName: testName);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                saved ? 'Test annulé. Résultats partiels enregistrés.' : 'Test annulé. Aucun résultat partiel à enregistrer.',
-                style: const TextStyle(color: Colors.white),
-              ),
-              backgroundColor: Colors.black,
-              duration: const Duration(seconds: 3),
-            ),
-          );
-        }
-      } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Test annulé.', style: TextStyle(color: Colors.white)),
-            backgroundColor: Colors.black,
-            duration: Duration(seconds: 2),
-          ),
-        );
       }
-    } catch (e) {
+    } else if (testResult.result != null) {
+      final saved = await _saveResultsToFirestore(testResult.result!, completed: false, testType: testType, testName: testName);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erreur lors du traitement des résultats : $e', style: const TextStyle(color: Colors.white)),
+            content: Text(
+              saved ? 'Test annulé. Résultats partiels enregistrés.' : 'Test annulé. Aucun résultat partiel à enregistrer.',
+              style: const TextStyle(color: Colors.white),
+            ),
             backgroundColor: Colors.black,
             duration: const Duration(seconds: 3),
           ),
         );
       }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (widget.isCompleteTest || widget.category.isNotEmpty) {
-      return _TestRunner(
-        isTestRunning: _isTestRunning,
-        onStartTest: () async {
-          setState(() => _isTestRunning = true);
-          final task = widget.isCompleteTest ? _buildCompleteCognitionTask() : _buildCognitionTaskForCategory(widget.category);
-          final testResult = await _runCognitiveTest(context, task);
-          await _handleTestResult(
-            context,
-            testResult,
-            testType: widget.isCompleteTest ? 'Complet' : 'Catégorie',
-          );
-          setState(() => _isTestRunning = false);
-        },
-        title: widget.isCompleteTest ? 'Passer un Test Cognitif Complet' : 'Test Cognitif - ${widget.category}',
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Test annulé.', style: TextStyle(color: Colors.white)),
+          backgroundColor: Colors.black,
+          duration: Duration(seconds: 2),
+        ),
       );
     }
+  } catch (e) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur lors du traitement des résultats : $e', style: const TextStyle(color: Colors.white)),
+          backgroundColor: Colors.black,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+  } finally {
+    if (mounted) {
+      setState(() => _isTestRunning = false);
+    }
+  }
+}
 
-    return _TestList(
+  @override
+Widget build(BuildContext context) {
+  if (widget.isCompleteTest || widget.category.isNotEmpty) {
+    return _TestRunner(
       isTestRunning: _isTestRunning,
-      onSelectTest: (test) async {
-        setState(() => _isTestRunning = true);
-        final task = _buildTaskForIndividualTest(test['activity'], test['name']);
+      onStartTest: () async {
+        if (mounted) {
+          setState(() => _isTestRunning = true);
+        }
+        final task = widget.isCompleteTest ? _buildCompleteCognitionTask() : _buildCognitionTaskForCategory(widget.category);
         final testResult = await _runCognitiveTest(context, task);
         await _handleTestResult(
           context,
           testResult,
-          testType: 'Individuel',
-          testName: test['name'],
+          testType: widget.isCompleteTest ? 'Complet' : 'Catégorie',
         );
-        setState(() => _isTestRunning = false);
+        if (mounted) {
+          setState(() => _isTestRunning = false);
+        }
       },
+      title: widget.isCompleteTest ? 'Passer un Test Cognitif Complet' : 'Test Cognitif - ${widget.category}',
     );
   }
+
+  return _TestList(
+    isTestRunning: _isTestRunning,
+    onSelectTest: (test) async {
+      if (mounted) {
+        setState(() => _isTestRunning = true);
+      }
+      final task = _buildTaskForIndividualTest(test['activity'], test['name']);
+      final testResult = await _runCognitiveTest(context, task);
+      await _handleTestResult(
+        context,
+        testResult,
+        testType: 'Individuel',
+        testName: test['name'],
+      );
+      if (mounted) {
+        setState(() => _isTestRunning = false);
+      }
+    },
+  );
+}
 }
 
 // Widget pour exécuter un test complet ou par catégorie

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../widgets/custom_button.dart';
+import '../shared/widgets/custom_button.dart';
 
 class SignupChoiceScreen extends StatelessWidget {
   const SignupChoiceScreen({super.key});

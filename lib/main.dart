@@ -5,16 +5,16 @@ import 'package:research_package/research_package.dart';
 import 'package:cognition_package/cognition_package.dart';
 import 'package:research_package/ui.dart';
 import 'package:cognition_package/ui.dart';
-import 'screens/splash_screen.dart';
-import 'screens/welcome_screen.dart';
-import 'screens/auth_screen.dart';
-import 'screens/signup_choice_screen.dart';
-import 'screens/doctor_registration_screen.dart';
-import 'screens/patient_registration_screen.dart';
-import 'screens/main_screen.dart';
-import 'screens/doctor_main_screen.dart';
-import 'screens/profile_screen.dart';
-import 'screens/cognitive_test_screen.dart';
+import 'splash/splash_screen.dart';
+import 'auth/welcome_screen.dart';
+import 'auth/auth_screen.dart';
+import 'auth/signup_choice_screen.dart';
+import 'doctor/doctor_registration_screen.dart';
+import 'patient/patient_registration_screen.dart';
+import 'patient/main_screen.dart';
+import 'doctor/doctor_main_screen.dart';
+import 'patient/profile_screen.dart';
+import 'patient/cognitive_test_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

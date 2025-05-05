@@ -3,7 +3,7 @@ import 'home_screen.dart';
 import 'cognitive_test_screen.dart';
 import 'history_screen.dart';
 import 'profile_screen.dart';
-import '../widgets/gradient_background.dart';
+import '../shared/widgets/gradient_background.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});

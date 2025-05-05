@@ -3,7 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'doctor_profile_screen.dart';
 import 'patient_list_screen.dart';
-import '../widgets/gradient_background.dart';
+import '../shared/widgets/gradient_background.dart';
 
 class DoctorMainScreen extends StatefulWidget {
   const DoctorMainScreen({super.key});

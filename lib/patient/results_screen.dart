@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
-import '../widgets/gradient_background.dart';
+import '../shared/widgets/gradient_background.dart';
 
 class ResultsScreen extends StatelessWidget {
   final Map<String, dynamic> scores;
+  final int? mmseScore;
 
-  const ResultsScreen({super.key, required this.scores});
+  const ResultsScreen({super.key, required this.scores, this.mmseScore});
 
   @override
   Widget build(BuildContext context) {
@@ -30,6 +31,17 @@ class ResultsScreen extends StatelessWidget {
                   color: Colors.white,
                 ),
               ),
+              if (mmseScore != null) ...[
+                const SizedBox(height: 10),
+                Text(
+                  'Score MMSE : $mmseScore/30',
+                  style: const TextStyle(
+                    fontSize: 20.0,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
               const SizedBox(height: 20),
               Expanded(
                 child: ListView.builder(

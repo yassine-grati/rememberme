@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../widgets/custom_button.dart';
-import '../widgets/gradient_background.dart';
+import '../shared/widgets/custom_button.dart';
+import '../shared/widgets/gradient_background.dart';
 
 class DoctorProfileScreen extends StatefulWidget {
   const DoctorProfileScreen({super.key});
