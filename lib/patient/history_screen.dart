@@ -32,15 +32,18 @@ class HistoryScreen extends StatelessWidget {
           iconTheme: const IconThemeData(color: Colors.white),
         ),
         body: StreamBuilder<QuerySnapshot>(
-          stream: FirebaseFirestore.instance
-              .collection('users')
-              .doc(user.uid)
-              .collection('cognitive_results')
-              .orderBy('timestamp', descending: true)
-              .snapshots(),
+          stream:
+              FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(user.uid)
+                  .collection('cognitive_results')
+                  .orderBy('timestamp', descending: true)
+                  .snapshots(),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator(color: Colors.white));
+              return const Center(
+                child: CircularProgressIndicator(color: Colors.white),
+              );
             }
             if (snapshot.hasError) {
               return const Center(
@@ -60,7 +63,10 @@ class HistoryScreen extends StatelessWidget {
             }
 
             return ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 24.0,
+                vertical: 16.0,
+              ),
               itemCount: snapshot.data!.docs.length,
               itemBuilder: (context, index) {
                 final doc = snapshot.data!.docs[index];
@@ -79,7 +85,8 @@ class HistoryScreen extends StatelessWidget {
                 } else if (testType == 'Catégorie') {
                   displayTitle = 'Test de $category';
                 } else {
-                  displayTitle = testName.isNotEmpty ? testName : 'Test Individuel';
+                  displayTitle =
+                      testName.isNotEmpty ? testName : 'Test Individuel';
                 }
 
                 return Card(
@@ -101,66 +108,93 @@ class HistoryScreen extends StatelessWidget {
                     onTap: () {
                       showDialog(
                         context: context,
-                        builder: (context) => AlertDialog(
-                          backgroundColor: const Color(0xFF1976D2).withOpacity(0.9),
-                          title: Text(
-                            'Détails du test - $displayTitle',
-                            style: const TextStyle(color: Colors.white),
-                          ),
-                          content: SingleChildScrollView(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Date : ${timestamp.toLocal()}',
-                                  style: const TextStyle(color: Colors.white),
-                                ),
-                                if (testType != 'Individuel')
-                                  Text(
-                                    'Catégorie : $category',
-                                    style: const TextStyle(color: Colors.white),
-                                  ),
-                                Text(
-                                  'Statut : ${completed ? 'Complété' : 'Incomplet'}',
-                                  style: const TextStyle(color: Colors.white),
-                                ),
-                                const SizedBox(height: 16),
-                                const Text(
-                                  'Scores :',
-                                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                                ),
-                                const SizedBox(height: 8),
-                                ...scores.entries.map((entry) {
-                                  return Padding(
-                                    padding: const EdgeInsets.symmetric(vertical: 4.0),
-                                    child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text(
-                                          entry.key,
-                                          style: const TextStyle(color: Colors.white),
-                                        ),
-                                        Text(
-                                          entry.value.toString(),
-                                          style: const TextStyle(color: Colors.white),
-                                        ),
-                                      ],
+                        builder:
+                            (context) => AlertDialog(
+                              backgroundColor: const Color(
+                                0xFF1976D2,
+                              ).withOpacity(0.9),
+                              title: Text(
+                                'Détails du test - $displayTitle',
+                                style: const TextStyle(color: Colors.white),
+                              ),
+                              content: SingleChildScrollView(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Date : ${timestamp.toLocal()}',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                      ),
                                     ),
-                                  );
-                                }).toList(),
+                                    if (testType != 'Individuel')
+                                      Text(
+                                        'Catégorie : $category',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    Text(
+                                      'Statut : ${completed ? 'Complété' : 'Incomplet'}',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                    if (data['mmseScore'] != null)
+                                      Text(
+                                        'Score MMSE : ${data['mmseScore']}/30',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    const SizedBox(height: 16),
+                                    const Text(
+                                      'Scores :',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    ...scores.entries.map((entry) {
+                                      return Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 4.0,
+                                        ),
+                                        child: Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Text(
+                                              entry.key,
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                            Text(
+                                              entry.value.toString(),
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    }).toList(),
+                                  ],
+                                ),
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context),
+                                  child: const Text(
+                                    'Fermer',
+                                    style: TextStyle(color: Colors.white),
+                                  ),
+                                ),
                               ],
                             ),
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(context),
-                              child: const Text(
-                                'Fermer',
-                                style: TextStyle(color: Colors.white),
-                              ),
-                            ),
-                          ],
-                        ),
                       );
                     },
                   ),

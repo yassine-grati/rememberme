@@ -200,7 +200,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     ),
                     const SizedBox(height: 16.0),
                     _buildCategorySection('Enregistrement'),
-                    _buildCategorySection('Attention & Calcul'),
+                    _buildCategorySection('Attention et Calcul'),
                     _buildCategorySection('Rappel'),
                     _buildCategorySection('Langage'),
                     _buildCategorySection('Perception'),

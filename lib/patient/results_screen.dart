@@ -54,11 +54,17 @@ class ResultsScreen extends StatelessWidget {
                       child: ListTile(
                         title: Text(
                           testName,
-                          style: const TextStyle(color: Colors.white, fontSize: 18),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                          ),
                         ),
                         trailing: Text(
                           score.toString(),
-                          style: const TextStyle(color: Colors.white, fontSize: 18),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                          ),
                         ),
                       ),
                     );
