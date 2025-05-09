@@ -4,7 +4,7 @@
 ## 🧩 Description
 
 **rememberme** is a mobile application designed for the early detection (*dépistage précoce*) of Alzheimer's disease. It analyzes users' cognitive performance through interactive memory games and quizzes. By leveraging artificial intelligence models, the app aims to identify early warning signs and assist users in seeking professional evaluation when necessary.
-
+DEMO VIDEOS: https://drive.google.com/drive/folders/136f5HEfe3Vax17ZdYQmFt_9NeKolLykw?usp=sharing
 ## 🧠 Key Features
 
 - 🧪 Interactive memory and cognitive tests
